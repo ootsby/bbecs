@@ -41,12 +41,14 @@ impl World {
         Self::default()
     }
 
+    ///Register a component name
     pub fn register<S: ToString>(&mut self, name: S) -> Result<()> {
         self.entity_data.register(name.to_string())?;
         self.bitmap.register(name.to_string());
         Ok(())
     }
 
+    ///Spawn an entity - use chaining of with_component to add components
     pub fn spawn_entity(&mut self) -> Result<&mut Self> {
         self.entity_data.insert(TO_BE_DELETED, false)?;
         self.entity_data.insert(ENTITY_ID, self.next_entity_id)?;
@@ -59,15 +61,20 @@ impl World {
         Ok(self)
     }
 
+    ///Request active component lists for a set of names
     pub fn query(&self, names: Vec<&str>) -> Result<HashMap<String, Vec<&ComponentData>>> {
         let bitmap_query = self.bitmap.query(names.clone())?;
         self.entity_data.query(bitmap_query)
     }
 
+    ///Get the resource registered under the provided name
     pub fn get_resource<S: Into<String>>(&self, name: S) -> Result<&Rc<RefCell<Resource>>> {
         self.resources.get(&name.into())
     }
 
+    ///Do per-frame world operations.
+    ///
+    ///Just deletions for now.
     pub fn update(&mut self) -> Result<()> {
         let query_results = self.query(vec![TO_BE_DELETED])?;
         let to_be_deleted_query = query_results.get(TO_BE_DELETED).unwrap();
@@ -96,6 +103,7 @@ impl World {
         Ok(())
     }
 
+    ///Delete entity (deletions are queued and actioned on update call)
     pub fn delete_by_id(&self, id: u32) -> Result<()> {
         let query_results = self.query(vec![TO_BE_DELETED, ENTITY_ID])?;
         let query_to_be_deleted = query_results.get(TO_BE_DELETED).unwrap();
