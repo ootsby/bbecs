@@ -13,3 +13,9 @@ repository = "https://github.com/brooks-builds/bbecs"
 eyre = "0.6.5"
 ggez = "0.5.1"
 thiserror = "1.0.24"
+criterion = "0.3.3"
+cargo-criterion = "1.0.1"
+
+[[bench]]
+name = "bbecs_benchmark"
+harness = false
