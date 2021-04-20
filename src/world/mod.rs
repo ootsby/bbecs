@@ -10,7 +10,7 @@ use eyre::Result;
 use ggez::event::KeyCode;
 use ggez::graphics::{Color, Mesh, Text};
 
-use crate::components::{CastComponents, ComponentData};
+use crate::{components::{CastComponents, ComponentData}, errors::BbEcsError};
 use crate::data_types::point::Point;
 use crate::resources::resource::Resource;
 use crate::resources::resources_data::ResourcesData;
@@ -20,6 +20,7 @@ use self::entity_data::EntityDataTraits;
 
 const TO_BE_DELETED: &str = "to be deleted";
 pub const ENTITY_ID: &str = "entity id";
+const MAX_COMPONENT_TYPES:usize = 64;
 
 pub type DataWrapper<T> = Rc<RefCell<T>>;
 
@@ -30,6 +31,7 @@ pub trait WorldMethods<T> {
 
 pub struct World {
     pub entity_data: EntityData,
+    pub component_type_lookup: HashMap<String, u64>,
     resources: ResourcesData,
     is_empty: bool,
     next_entity_id: u32,
@@ -42,8 +44,14 @@ impl World {
     }
 
     ///Register a component name
-    pub fn register<S: ToString>(&mut self, name: S) -> Result<()> {
-        self.entity_data.register(name.to_string())?;
+    pub fn register<S: ToString>(&mut self, name: S) -> Result<()> {        
+        if !self.component_type_lookup.contains_key(&name.to_string()){
+            if self.component_type_lookup.len() >= MAX_COMPONENT_TYPES {
+                return Err(BbEcsError::TooManyComponentTypes(name.to_string().to_owned()).into());
+            }
+            self.component_type_lookup.insert(name.to_string(), 1 << self.component_type_lookup.len());
+        }
+        self.entity_data.register(name.to_string())?;        
         self.bitmap.register(name.to_string());
         Ok(())
     }
@@ -136,6 +144,7 @@ impl Default for World {
 
         Self {
             entity_data,
+            component_type_lookup: HashMap::new(),
             resources: ResourcesData::new(),
             is_empty: true,
             next_entity_id: 0,
