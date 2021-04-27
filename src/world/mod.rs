@@ -10,17 +10,16 @@ use eyre::Result;
 use ggez::event::KeyCode;
 use ggez::graphics::{Color, Mesh, Text};
 
-use crate::{components::{CastComponents, ComponentData}, errors::BbEcsError};
+use crate::{components::{CastComponents, ComponentData}};
 use crate::data_types::point::Point;
 use crate::resources::resource::Resource;
 use crate::resources::resources_data::ResourcesData;
 
 use self::bitmap::BitMap;
-use self::entity_data::EntityDataTraits;
+//use self::entity_data::EntityDataTraits;
 
 const TO_BE_DELETED: &str = "to be deleted";
 pub const ENTITY_ID: &str = "entity id";
-const MAX_COMPONENT_TYPES:usize = 64;
 
 pub type DataWrapper<T> = Rc<RefCell<T>>;
 
@@ -31,10 +30,11 @@ pub trait WorldMethods<T> {
 
 pub struct World {
     pub entity_data: EntityData,
-    pub component_type_lookup: HashMap<String, u64>,
     resources: ResourcesData,
     is_empty: bool,
-    next_entity_id: u32,
+    id_reuse_queue: Vec<usize>,
+    next_entity_id: usize,
+    last_spawned_id: usize,
     bitmap: BitMap,
 }
 
@@ -45,26 +45,23 @@ impl World {
 
     ///Register a component name
     pub fn register<S: ToString>(&mut self, name: S) -> Result<()> {        
-        if !self.component_type_lookup.contains_key(&name.to_string()){
-            if self.component_type_lookup.len() >= MAX_COMPONENT_TYPES {
-                return Err(BbEcsError::TooManyComponentTypes(name.to_string().to_owned()).into());
-            }
-            self.component_type_lookup.insert(name.to_string(), 1 << self.component_type_lookup.len());
-        }
+        
         self.entity_data.register(name.to_string())?;        
-        self.bitmap.register(name.to_string());
+        self.bitmap.register(name.to_string())?;
         Ok(())
     }
 
     ///Spawn an entity - use chaining of with_component to add components
     pub fn spawn_entity(&mut self) -> Result<&mut Self> {
-        self.entity_data.insert(TO_BE_DELETED, false)?;
-        self.entity_data.insert(ENTITY_ID, self.next_entity_id)?;
-        self.bitmap.spawn_entity();
-        self.bitmap.insert(TO_BE_DELETED)?;
-        self.bitmap.insert(ENTITY_ID)?;
+        self.last_spawned_id = if self.id_reuse_queue.is_empty() { self.next_entity_id } else { self.id_reuse_queue.pop().unwrap() };
+        if self.last_spawned_id == self.next_entity_id{
+            self.next_entity_id += 1;
+        }
+        //self.entity_data.insert(TO_BE_DELETED, self.last_spawned_id, ComponentData::from_raw_data(false))?;
+        self.entity_data.insert(ENTITY_ID, self.last_spawned_id, ComponentData::from_raw_data(self.last_spawned_id))?;
+        self.bitmap.insert(self.last_spawned_id, ENTITY_ID)?;
         self.is_empty = false;
-        self.next_entity_id += 1;
+        
 
         Ok(self)
     }
@@ -72,7 +69,10 @@ impl World {
     ///Request active component lists for a set of names
     pub fn query(&self, names: Vec<&str>) -> Result<HashMap<String, Vec<&ComponentData>>> {
         let bitmap_query = self.bitmap.query(names.clone())?;
-        self.entity_data.query(bitmap_query)
+        // if bitmap_query.len() == 0{
+        //     dbg!("waah!");
+        // }
+        self.entity_data.query(names, bitmap_query)
     }
 
     ///Get the resource registered under the provided name
@@ -84,50 +84,38 @@ impl World {
     ///
     ///Just deletions for now.
     pub fn update(&mut self) -> Result<()> {
-        let query_results = self.query(vec![TO_BE_DELETED])?;
-        let to_be_deleted_query = query_results.get(TO_BE_DELETED).unwrap();
-        let mut bitmap_indexes_to_delete = vec![];
-
-        to_be_deleted_query
-            .iter()
-            .enumerate()
-            .for_each(|(index, to_be_deleted)| {
-                let to_be_deleted: &Rc<RefCell<bool>> = to_be_deleted.cast().unwrap();
-                let to_be_deleted = to_be_deleted.borrow();
-                if *to_be_deleted {
-                    bitmap_indexes_to_delete.push(index);
-                }
-            });
-
-        let component_indexes_to_delete = self
-            .bitmap
-            .calculate_component_indexes_to_delete(&bitmap_indexes_to_delete)?;
+        let mut bitmap_indexes_to_delete = self.bitmap.query(vec![TO_BE_DELETED])?;
 
         self.bitmap
-            .delete_entities_by_index(bitmap_indexes_to_delete)?;
+            .delete_entities_by_index(&bitmap_indexes_to_delete)?;
 
         self.entity_data
-            .delete_entities_by_index(component_indexes_to_delete)?;
+            .delete_entities_by_index(&bitmap_indexes_to_delete)?;
+
+        self.id_reuse_queue.append(&mut bitmap_indexes_to_delete);
         Ok(())
     }
 
     ///Delete entity (deletions are queued and actioned on update call)
-    pub fn delete_by_id(&self, id: u32) -> Result<()> {
-        let query_results = self.query(vec![TO_BE_DELETED, ENTITY_ID])?;
-        let query_to_be_deleted = query_results.get(TO_BE_DELETED).unwrap();
-        let query_ids = query_results.get(ENTITY_ID).unwrap();
+    pub fn delete_by_id(&mut self, id: usize) -> Result<()> {
+        self.entity_data.insert(TO_BE_DELETED, id, ComponentData::from_raw_data(true))?;
+        self.bitmap.insert(id, TO_BE_DELETED)?;
+        
+        // let query_results = self.query(vec![TO_BE_DELETED, ENTITY_ID])?;
+        // let query_to_be_deleted = query_results.get(TO_BE_DELETED).unwrap();
+        // let query_ids = query_results.get(ENTITY_ID).unwrap();
 
-        for (index, component_id) in query_ids.iter().enumerate() {
-            let wrapped_component_id: &Rc<RefCell<u32>> = component_id.cast()?;
-            let component_id = wrapped_component_id.borrow();
+        // for (index, component_id) in query_ids.iter().enumerate() {
+        //     let wrapped_component_id: &Rc<RefCell<usize>> = component_id.cast()?;
+        //     let component_id = wrapped_component_id.borrow();
 
-            if *component_id == id {
-                let wrapped_to_be_deleted: &Rc<RefCell<bool>> =
-                    query_to_be_deleted[index].cast()?;
-                let mut to_be_deleted = wrapped_to_be_deleted.borrow_mut();
-                *to_be_deleted = true;
-            }
-        }
+        //     if *component_id == id {
+        //         let wrapped_to_be_deleted: &Rc<RefCell<bool>> =
+        //             query_to_be_deleted[index].cast()?;
+        //         let mut to_be_deleted = wrapped_to_be_deleted.borrow_mut();
+        //         *to_be_deleted = true;
+        //     }
+        // }
         Ok(())
     }
 }
@@ -138,16 +126,17 @@ impl Default for World {
         let mut bitmap = BitMap::new();
 
         entity_data.register(TO_BE_DELETED.into()).unwrap();
-        bitmap.register(TO_BE_DELETED.into());
+        bitmap.register(TO_BE_DELETED.into()).unwrap();
         entity_data.register(ENTITY_ID.into()).unwrap();
-        bitmap.register(ENTITY_ID.into());
+        bitmap.register(ENTITY_ID.into()).unwrap();
 
         Self {
             entity_data,
-            component_type_lookup: HashMap::new(),
             resources: ResourcesData::new(),
             is_empty: true,
+            id_reuse_queue: Vec::new(),
             next_entity_id: 0,
+            last_spawned_id: 0,
             bitmap,
         }
     }
@@ -155,8 +144,8 @@ impl Default for World {
 
 impl WorldMethods<Point> for World {
     fn with_component(&mut self, name: &str, data: Point) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -167,8 +156,8 @@ impl WorldMethods<Point> for World {
 
 impl WorldMethods<Color> for World {
     fn with_component(&mut self, name: &str, data: Color) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -179,8 +168,8 @@ impl WorldMethods<Color> for World {
 
 impl WorldMethods<Mesh> for World {
     fn with_component(&mut self, name: &str, data: Mesh) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -191,8 +180,8 @@ impl WorldMethods<Mesh> for World {
 
 impl WorldMethods<u32> for World {
     fn with_component(&mut self, name: &str, data: u32) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -203,8 +192,8 @@ impl WorldMethods<u32> for World {
 
 impl WorldMethods<f32> for World {
     fn with_component(&mut self, name: &str, data: f32) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -215,8 +204,8 @@ impl WorldMethods<f32> for World {
 
 impl WorldMethods<usize> for World {
     fn with_component(&mut self, name: &str, data: usize) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -227,8 +216,8 @@ impl WorldMethods<usize> for World {
 
 impl WorldMethods<bool> for World {
     fn with_component(&mut self, name: &str, data: bool) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -239,8 +228,8 @@ impl WorldMethods<bool> for World {
 
 impl WorldMethods<KeyCode> for World {
     fn with_component(&mut self, name: &str, data: KeyCode) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -251,8 +240,8 @@ impl WorldMethods<KeyCode> for World {
 
 impl WorldMethods<String> for World {
     fn with_component(&mut self, name: &str, data: String) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -263,8 +252,8 @@ impl WorldMethods<String> for World {
 
 impl WorldMethods<Text> for World {
     fn with_component(&mut self, name: &str, data: Text) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 
@@ -275,8 +264,8 @@ impl WorldMethods<Text> for World {
 
 impl WorldMethods<ggez::audio::SoundData> for World {
     fn with_component(&mut self, name: &str, data: ggez::audio::SoundData) -> Result<&mut Self> {
-        self.entity_data.insert(name, data)?;
-        self.bitmap.insert(name)?;
+        self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+        self.bitmap.insert(self.last_spawned_id, name)?;
         Ok(self)
     }
 

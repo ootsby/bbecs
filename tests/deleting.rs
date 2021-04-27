@@ -30,15 +30,18 @@ fn deleting_an_entity_by_id() -> Result<()> {
         let query_results = world.query(vec!["location", ENTITY_ID])?;
         let locations = query_results.get("location").unwrap();
         let ids = query_results.get(ENTITY_ID).unwrap();
+        let mut ids_to_delete = Vec::new();
 
         for (index, location) in locations.iter().enumerate() {
             let wrapped_location: &Rc<RefCell<Point>> = location.cast()?;
             let location = wrapped_location.borrow();
             if *location == Point::new(10.0, 10.0) {
-                let wrapped_id: &Rc<RefCell<u32>> = ids[index].cast()?;
-                let id = wrapped_id.borrow();
-                world.delete_by_id(*id)?;
+                let wrapped_id: &Rc<RefCell<usize>> = ids[index].cast()?;
+                ids_to_delete.push(*wrapped_id.borrow());
             }
+        }
+        for id in ids_to_delete{
+            world.delete_by_id(id)?;
         }
     }
 
@@ -64,7 +67,7 @@ fn inserting_an_entity_after_deleting_should_work() -> Result<()> {
 
     let query = world.query(vec!["size", ENTITY_ID])?;
     let _wrapped_size: &DataWrapper<f32> = query.get("size").unwrap()[0].cast()?;
-    let wrapped_id: &DataWrapper<u32> = query.get(ENTITY_ID).unwrap()[0].cast()?;
+    let wrapped_id: &DataWrapper<usize> = query.get(ENTITY_ID).unwrap()[0].cast()?;
 
     let id = *wrapped_id.borrow();
 
@@ -76,10 +79,12 @@ fn inserting_an_entity_after_deleting_should_work() -> Result<()> {
 
     let query = world.query(vec!["size", ENTITY_ID])?;
     let wrapped_size: &DataWrapper<f32> = query.get("size").unwrap()[0].cast()?;
-    let wrapped_id: &DataWrapper<u32> = query.get(ENTITY_ID).unwrap()[0].cast()?;
+    let wrapped_id: &DataWrapper<usize> = query.get(ENTITY_ID).unwrap()[0].cast()?;
 
-    assert_eq!(1, *wrapped_id.borrow());
-    assert_eq!(*wrapped_size.borrow(), 30.0_f32);
+    let test_id = *wrapped_id.borrow();
+    let test_size = *wrapped_size.borrow();
+    assert_eq!(0, test_id);
+    assert_eq!(test_size, 30.0_f32);
 
     Ok(())
 }

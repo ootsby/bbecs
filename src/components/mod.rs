@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use eyre::Result;
-use ggez::event::KeyCode;
+use ggez::{audio::SoundData, event::KeyCode};
 use ggez::graphics::{Color, Mesh, Text};
 
 use crate::data_types::point::Point;
@@ -11,6 +11,7 @@ use crate::errors::BbEcsError;
 pub trait CastComponents<T> {
     fn cast_mut(&mut self) -> Result<&mut Rc<RefCell<T>>>;
     fn cast(&self) -> Result<&Rc<RefCell<T>>>;
+    fn from_raw_data(data: T) -> ComponentData;
 }
 
 /// These components are used to store data into the world. Each of the components contains
@@ -24,12 +25,14 @@ pub enum ComponentData {
     Color(Rc<RefCell<Color>>),
     Mesh(Rc<RefCell<Mesh>>),
     U32(Rc<RefCell<u32>>),
+    U64(Rc<RefCell<u64>>),
     Usize(Rc<RefCell<usize>>),
     Bool(Rc<RefCell<bool>>),
     GgezKeyCode(Rc<RefCell<KeyCode>>),
     Marker(Rc<RefCell<String>>),
     GgezText(Rc<RefCell<Text>>),
     GgezSound(Rc<RefCell<ggez::audio::SoundData>>),
+    Blank,
 }
 
 impl CastComponents<Point> for ComponentData {
@@ -47,6 +50,10 @@ impl CastComponents<Point> for ComponentData {
         } else {
             Err(BbEcsError::CastingComponents("Point").into())
         }
+    }
+
+    fn from_raw_data(data: Point) -> ComponentData{
+        ComponentData::Point(Rc::new(RefCell::new(data)))
     }
 }
 
@@ -66,6 +73,10 @@ impl CastComponents<f32> for ComponentData {
             Err(BbEcsError::CastingComponents("F32").into())
         }
     }
+
+    fn from_raw_data(data: f32) -> ComponentData{
+        ComponentData::F32(Rc::new(RefCell::new(data)))
+    }
 }
 
 impl CastComponents<Color> for ComponentData {
@@ -83,6 +94,10 @@ impl CastComponents<Color> for ComponentData {
         } else {
             Err(BbEcsError::CastingComponents("Color").into())
         }
+    }
+
+    fn from_raw_data(data: Color) -> ComponentData{
+        ComponentData::Color(Rc::new(RefCell::new(data)))
     }
 }
 
@@ -102,6 +117,10 @@ impl CastComponents<Mesh> for ComponentData {
             Err(BbEcsError::CastingComponents("Mesh").into())
         }
     }
+
+    fn from_raw_data(data: Mesh) -> ComponentData{
+        ComponentData::Mesh(Rc::new(RefCell::new(data)))
+    }
 }
 
 impl CastComponents<u32> for ComponentData {
@@ -119,6 +138,32 @@ impl CastComponents<u32> for ComponentData {
         } else {
             Err(BbEcsError::CastingComponents("U32").into())
         }
+    }
+
+    fn from_raw_data(data: u32) -> ComponentData{
+        ComponentData::U32(Rc::new(RefCell::new(data)))
+    }
+}
+
+impl CastComponents<u64> for ComponentData {
+    fn cast_mut(&mut self) -> Result<&mut Rc<RefCell<u64>>> {
+        if let Self::U64(number) = self {
+            Ok(number)
+        } else {
+            Err(BbEcsError::CastingComponents("U64").into())
+        }
+    }
+
+    fn cast(&self) -> Result<&Rc<RefCell<u64>>> {
+        if let Self::U64(number) = self {
+            Ok(number)
+        } else {
+            Err(BbEcsError::CastingComponents("U64").into())
+        }
+    }
+
+    fn from_raw_data(data: u64) -> ComponentData{
+        ComponentData::U64(Rc::new(RefCell::new(data)))
     }
 }
 
@@ -138,6 +183,10 @@ impl CastComponents<usize> for ComponentData {
             Err(BbEcsError::CastingComponents("Usize").into())
         }
     }
+
+    fn from_raw_data(data: usize) -> ComponentData{
+        ComponentData::Usize(Rc::new(RefCell::new(data)))
+    }
 }
 
 impl CastComponents<bool> for ComponentData {
@@ -155,6 +204,10 @@ impl CastComponents<bool> for ComponentData {
         } else {
             Err(BbEcsError::CastingComponents("Bool").into())
         }
+    }
+
+    fn from_raw_data(data: bool) -> ComponentData{
+        ComponentData::Bool(Rc::new(RefCell::new(data)))
     }
 }
 
@@ -174,6 +227,10 @@ impl CastComponents<KeyCode> for ComponentData {
             Err(BbEcsError::CastingComponents("GgezKeyCode").into())
         }
     }
+
+    fn from_raw_data(data: KeyCode) -> ComponentData{
+        ComponentData::GgezKeyCode(Rc::new(RefCell::new(data)))
+    }
 }
 
 impl CastComponents<String> for ComponentData {
@@ -191,6 +248,10 @@ impl CastComponents<String> for ComponentData {
         } else {
             Err(BbEcsError::CastingComponents("Marker").into())
         }
+    }
+
+    fn from_raw_data(data: String) -> ComponentData{
+        ComponentData::Marker(Rc::new(RefCell::new(data)))
     }
 }
 
@@ -210,6 +271,10 @@ impl CastComponents<Text> for ComponentData {
             Err(BbEcsError::CastingComponents("GgezText").into())
         }
     }
+
+    fn from_raw_data(data: Text) -> ComponentData{
+        ComponentData::GgezText(Rc::new(RefCell::new(data)))
+    }
 }
 
 impl CastComponents<ggez::audio::SoundData> for ComponentData {
@@ -228,6 +293,10 @@ impl CastComponents<ggez::audio::SoundData> for ComponentData {
             Err(BbEcsError::CastingComponents("GgezSound").into())
         }
     }
+
+    fn from_raw_data(data: SoundData) -> ComponentData{
+        ComponentData::GgezSound(Rc::new(RefCell::new(data)))
+    }
 }
 pub enum Component {
     Point,
@@ -235,6 +304,7 @@ pub enum Component {
     Color,
     Mesh,
     U32,
+    U64,
     Usize,
     Bool,
     GgezKeyCode,
