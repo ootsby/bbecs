@@ -49,7 +49,7 @@ pub struct World {
     pub entity_data: EntityData,
     resources: ResourcesData,
     is_empty: bool,
-    next_entity_id: u32,
+    next_entity_id: usize,
     bitmap: BitMap,
 }
 
@@ -113,13 +113,13 @@ impl World {
         Ok(())
     }
 
-    pub fn delete_by_id(&self, id: u32) -> Result<()> {
+    pub fn delete_by_id(&self, id: usize) -> Result<()> {
         let query_results = self.query(vec![TO_BE_DELETED, ENTITY_ID])?;
         let query_to_be_deleted = query_results.get(TO_BE_DELETED).unwrap();
         let query_ids = query_results.get(ENTITY_ID).unwrap();
 
         for (index, component_id) in query_ids.iter().enumerate() {
-            let wrapped_component_id: &Rc<RefCell<u32>> = component_id.cast()?;
+            let wrapped_component_id: &Rc<RefCell<usize>> = component_id.cast()?;
             let component_id = wrapped_component_id.borrow();
 
             if *component_id == id {

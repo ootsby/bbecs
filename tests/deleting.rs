@@ -35,7 +35,7 @@ fn deleting_an_entity_by_id() -> Result<()> {
             let wrapped_location: &Rc<RefCell<Point>> = location.cast()?;
             let location = wrapped_location.borrow();
             if *location == Point::new(10.0, 10.0) {
-                let wrapped_id: &Rc<RefCell<u32>> = ids[index].cast()?;
+                let wrapped_id: &Rc<RefCell<usize>> = ids[index].cast()?;
                 let id = wrapped_id.borrow();
                 world.delete_by_id(*id)?;
             }
@@ -64,7 +64,7 @@ fn inserting_an_entity_after_deleting_should_work() -> Result<()> {
 
     let query = world.query(vec!["size", ENTITY_ID])?;
     let _wrapped_size: &DataWrapper<f32> = query.get("size").unwrap()[0].cast()?;
-    let wrapped_id: &DataWrapper<u32> = query.get(ENTITY_ID).unwrap()[0].cast()?;
+    let wrapped_id: &DataWrapper<usize> = query.get(ENTITY_ID).unwrap()[0].cast()?;
 
     let id = *wrapped_id.borrow();
 

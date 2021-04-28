@@ -77,7 +77,7 @@ fn inserting_deleting(num_entities: u32, num_cycles: u32) -> Result<()> {
     let size = 15_u32;
     
     for _ in 0..num_cycles {
-        let ids: Vec<u32>;
+        let ids: Vec<usize>;
         {
             let query = world.query(vec![SIZE_NAME, ENTITY_ID])?;
 
@@ -89,7 +89,7 @@ fn inserting_deleting(num_entities: u32, num_cycles: u32) -> Result<()> {
                 .collect();
         }
         for &id in ids.iter() {
-            world.delete_by_id(std::convert::TryInto::try_into(id).unwrap())?;
+            world.delete_by_id(id)?;
         }
 
         world.update()?;
