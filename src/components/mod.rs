@@ -3,14 +3,9 @@ pub mod helpers;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-<<<<<<< HEAD
-use eyre::Result;
-use ggez::{audio::SoundData, event::KeyCode};
-=======
 use eyre::{bail, Result};
 use ggez::audio::SoundData;
 use ggez::event::KeyCode;
->>>>>>> bench
 use ggez::graphics::{Color, Mesh, Text};
 
 use crate::data_types::point::Point;
@@ -28,6 +23,10 @@ macro_rules! impl_component_data_cast {
                         stringify!($new_type)
                     )
                 }
+            }
+
+            fn from_raw_data(data: $new_type) -> ComponentData {
+                ComponentData::$arm(Rc::new(RefCell::new(data)))
             }
         }
     };

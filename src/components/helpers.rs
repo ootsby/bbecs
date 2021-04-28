@@ -22,7 +22,7 @@
 ///
 /// for (index, size) in sizes.iter().enumerate() {
 ///     let size: &DataWrapper<f32> = size.cast().unwrap();
-///     let entity_id: &DataWrapper<u32> = entity_ids[index].cast().unwrap();
+///     let entity_id: &DataWrapper<usize> = entity_ids[index].cast().unwrap();
 ///
 ///     assert_eq!(*size.borrow(), 15.0);
 ///     assert_eq!(*entity_id.borrow(), 0);

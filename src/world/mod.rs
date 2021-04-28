@@ -17,14 +17,13 @@ use crate::resources::resource::Resource;
 use crate::resources::resources_data::ResourcesData;
 
 use self::bitmap::BitMap;
-//use self::entity_data::EntityDataTraits;
 
 macro_rules! impl_world_trait {
     ($new_type:ty, $arm:ident) => {
         impl WorldMethods<$new_type> for World {
             fn with_component(&mut self, name: &str, data: $new_type) -> Result<&mut Self> {
-                self.entity_data.insert(name, data)?;
-                self.bitmap.insert(name)?;
+                self.entity_data.insert(name, self.last_spawned_id, ComponentData::from_raw_data(data))?;
+                self.bitmap.insert(self.last_spawned_id, name)?;
                 Ok(self)
             }
 
