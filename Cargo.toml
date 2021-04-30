@@ -8,6 +8,8 @@ license = "MIT"
 repository = "https://github.com/brooks-builds/bbecs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+bench = false
 
 [dependencies]
 eyre = "0.6.5"
