@@ -51,8 +51,8 @@ fn get_populated_world(num_entities: u32) -> Result<World> {
     Ok(world)
 }
 
-fn query_for_entities_mixed_components(num_entities: u32, num_queries: u32) -> Result<()> {
-    let world = get_populated_world(num_entities).unwrap();
+fn query_for_entities_mixed_components(world:&mut World, num_queries: u32) -> Result<()> {
+    //let world = get_populated_world(num_entities).unwrap();
 
     for _ in 0..num_queries {
         let components = world.query(vec![LOCATION_NAME, SIZE_NAME])?;
@@ -71,8 +71,8 @@ fn query_for_entities_mixed_components(num_entities: u32, num_queries: u32) -> R
 
     Ok(())
 }
-fn inserting_deleting(num_entities: u32, num_cycles: u32) -> Result<()> {
-    let mut world = get_populated_world(num_entities).unwrap();
+fn inserting_deleting(world:&mut World, num_cycles: u32) -> Result<()> {
+    //let mut world = get_populated_world(num_entities).unwrap();
     let location = Point::new(0.0, 0.0);
     let size = 15_u32;
     
@@ -117,10 +117,14 @@ fn inserting_deleting(num_entities: u32, num_cycles: u32) -> Result<()> {
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("mixed components - 1,000 entities, 1,000 queries", |b| {
-        b.iter(|| query_for_entities_mixed_components(black_box(1000), black_box(1000)))
+        b.iter_batched(||get_populated_world(black_box(1000)).unwrap(),
+        |mut world| query_for_entities_mixed_components(&mut world, black_box(1000)),
+        criterion::BatchSize::PerIteration)
     });
-    c.bench_function("del insert - 1,000 entities, 100 cycles", |b| {
-        b.iter(|| inserting_deleting(black_box(1000), black_box(100)))
+    c.bench_function("del insert - 1,000 entities, 10 cycles", |b| {
+        b.iter_batched(||get_populated_world(black_box(1000)).unwrap(),
+        |mut world| inserting_deleting(&mut world,black_box(10)),
+        criterion::BatchSize::PerIteration)
     });
 }
 
