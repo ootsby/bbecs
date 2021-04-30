@@ -88,9 +88,10 @@ fn inserting_deleting(num_entities: u32, num_cycles: u32) -> Result<()> {
                 .map(|&x| *x.cast().unwrap().borrow())
                 .collect();
         }
-        for &id in ids.iter() {
-            world.delete_by_id(id)?;
-        }
+        // for &id in ids.iter() {
+        //     world.delete_by_id(id)?;
+        // }
+        world.delete_ids(&ids)?;
 
         world.update()?;
 

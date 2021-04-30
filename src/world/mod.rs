@@ -73,7 +73,9 @@ impl World {
         if self.last_spawned_id == self.next_entity_id{
             self.next_entity_id += 1;
         }
-        //self.entity_data.insert(TO_BE_DELETED, self.last_spawned_id, ComponentData::from_raw_data(false))?;
+        self.entity_data.spawn_entity(self.last_spawned_id)?;
+        self.bitmap.spawn_entity(self.last_spawned_id)?;
+        
         self.entity_data.insert(ENTITY_ID, self.last_spawned_id, ComponentData::from_raw_data(self.last_spawned_id))?;
         self.bitmap.insert(self.last_spawned_id, ENTITY_ID)?;
         self.is_empty = false;
@@ -85,10 +87,8 @@ impl World {
     ///Request active component lists for a set of names
     pub fn query(&self, names: Vec<&str>) -> Result<HashMap<String, Vec<&ComponentData>>> {
         let bitmap_query = self.bitmap.query(names.clone())?;
-        // if bitmap_query.len() == 0{
-        //     dbg!("waah!");
-        // }
-        self.entity_data.query(names, bitmap_query)
+        
+        self.entity_data.query(names, &bitmap_query)
     }
 
     ///Get the resource registered under the provided name
@@ -112,26 +112,19 @@ impl World {
         Ok(())
     }
 
+    
+    ///Delete entities (deletions are queued and actioned on update call)
+    pub fn delete_ids(&mut self, ids: &[usize]) -> Result<()> {
+        self.bitmap.insert_for_many(ids, TO_BE_DELETED)?;
+
+        Ok(())
+    }
+
     ///Delete entity (deletions are queued and actioned on update call)
     pub fn delete_by_id(&mut self, id: usize) -> Result<()> {
-        self.entity_data.insert(TO_BE_DELETED, id, ComponentData::from_raw_data(true))?;
+        
         self.bitmap.insert(id, TO_BE_DELETED)?;
         
-        // let query_results = self.query(vec![TO_BE_DELETED, ENTITY_ID])?;
-        // let query_to_be_deleted = query_results.get(TO_BE_DELETED).unwrap();
-        // let query_ids = query_results.get(ENTITY_ID).unwrap();
-
-        // for (index, component_id) in query_ids.iter().enumerate() {
-        //     let wrapped_component_id: &Rc<RefCell<usize>> = component_id.cast()?;
-        //     let component_id = wrapped_component_id.borrow();
-
-        //     if *component_id == id {
-        //         let wrapped_to_be_deleted: &Rc<RefCell<bool>> =
-        //             query_to_be_deleted[index].cast()?;
-        //         let mut to_be_deleted = wrapped_to_be_deleted.borrow_mut();
-        //         *to_be_deleted = true;
-        //     }
-        // }
         Ok(())
     }
 }
