@@ -7,7 +7,7 @@ use crate::errors::BbEcsError;
 #[derive(Debug, Default)]
 pub struct BitMap {
     component_type_lookup: HashMap<String, u64>,
-    entity_map: Vec<u64>,
+    active_component_bitfields: Vec<u64>,
 }
 
 const MAX_COMPONENT_TYPES: usize = 64;
@@ -16,7 +16,7 @@ impl BitMap {
     pub fn new() -> Self {
         Self {
             component_type_lookup: HashMap::new(),
-            entity_map: Vec::new(),
+            active_component_bitfields: Vec::new(),
         }
     }
 
@@ -36,8 +36,8 @@ impl BitMap {
     }
 
     pub fn spawn_entity(&mut self, index: usize) -> Result<()> {
-        if index == self.entity_map.len() {
-            self.entity_map.push(0);
+        if index == self.active_component_bitfields.len() {
+            self.active_component_bitfields.push(0);
         }
 
         Ok(())
@@ -46,7 +46,7 @@ impl BitMap {
     ///Add component of named type to indexed entity record
     pub fn insert(&mut self, index: usize, name: &str) -> Result<()> {
         if let Some(&c_flag) = self.component_type_lookup.get(name) {
-            self.entity_map[index] |= c_flag;
+            self.active_component_bitfields[index] |= c_flag;
         } else {
             return Err(BbEcsError::BitMapInsertBeforeRegister.into());
         }
@@ -58,7 +58,7 @@ impl BitMap {
     pub fn insert_for_many(&mut self, ids: &[usize], name: &str) -> Result<()> {
         if let Some(&c_flag) = self.component_type_lookup.get(name) {
             for &id in ids {
-                self.entity_map[id] |= c_flag;
+                self.active_component_bitfields[id] |= c_flag;
             }
         } else {
             return Err(BbEcsError::BitMapInsertBeforeRegister.into());
@@ -77,7 +77,7 @@ impl BitMap {
 
         //get indices of components that match the bitfield component set
         let ret_ids = self
-            .entity_map
+            .active_component_bitfields
             .iter()
             .enumerate()
             .filter(|(_, &x)| (x & bitfield_match) == bitfield_match)
@@ -89,7 +89,7 @@ impl BitMap {
 
     pub fn delete_entities_by_index(&mut self, entity_indexes: &[usize]) -> Result<()> {
         for &index in entity_indexes {
-            self.entity_map[index] = 0;
+            self.active_component_bitfields[index] = 0;
         }
         Ok(())
     }
